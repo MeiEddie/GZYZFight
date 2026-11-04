@@ -13,7 +13,10 @@
  *            —— 数值不再逐个写，而是查下面的 FIGHTER_TYPES 自动套用：
  *               改 tag 就等于换整套数值（hp/move/dmg/前摇/判定/收招/距离/属性条/颜色）。
  *            —— 身体外观也跟着类型走（TYPE_BODY 见下方）：
- *               速度型 = 瘦（lan）、均衡型 = 女体（man）、力量型 = 胖（zhuang）、防御型 = 壮（zang）。
+ *               速度型 = 偏瘦（slim）、均衡型 = 匀称（normal）、
+ *               力量型 = 偏胖（heavy）、防御型 = 壮实（stout）。
+ *               这四个 id 只是「身体素材」，本身不带任何人物信息：
+ *               名字、班级、头像、数值全部在本文件里定义，与底模无关。
  *               改完 tag 保存刷新即可，头像与身体都是运行时合成，无需重新构建。
  *   intro    胜利结算时显示的一段介绍（自己写，长度建议不超过 3 行）
  *   faceRot  可选：头像额外旋转（弧度，顺时针为正）
@@ -52,12 +55,16 @@ export const FIGHTER_TYPES = {
   }
 };
 
-/** 类型 → 身体底模（精灵表）。改类型就等于换身体；头像始终是 assets/贴图/<学号>.png */
+/**
+ * 类型 → 身体底模（精灵表）。
+ * 左侧是玩法类型，右侧是 src/data/sprites.js 里的体型 id，只表达身体形态，
+ * 不指向任何具体人物；头像始终是 assets/贴图/<学号>.png。
+ */
 export const TYPE_BODY = {
-  速度型: 'lan',
-  均衡型: 'man',
-  力量型: 'zhuang',
-  防御型: 'zang'
+  速度型: 'slim',
+  均衡型: 'normal',
+  力量型: 'heavy',
+  防御型: 'stout'
 };
 
 /** 条目里只写「身份 + 类型 + 介绍」，数值由类型自动补全 */
@@ -125,6 +132,6 @@ export const ROSTER = [
 ].map(def => ({
   ...(FIGHTER_TYPES[def.tag] || FIGHTER_TYPES['均衡型']),
   ...def,
-  id: TYPE_BODY[def.tag] || 'lan',   // 身体底模
+  id: TYPE_BODY[def.tag] || 'normal',   // 身体底模（体型 id）
   face: def.no                      // 头像 = assets/贴图/<学号>.png
 }));

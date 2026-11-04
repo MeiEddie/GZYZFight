@@ -8,16 +8,21 @@
  *   type   image | audio
  *   src    相对 index.html 的路径
  *   label  加载进度里展示的中文名
- *   group  boot = 启动时预加载；lazy = 用到时才加载（按需）
+ *   group  boot = 启动时预加载（决定能不能进菜单，越小越快）
+ *          music = 进游戏后台加载，不阻塞启动
+ *          lazy = 用到时才加载（按需）
  *   loop   仅 audio：是否循环
  */
 
 export const MANIFEST = {
+  // 校歌 5.3MB，是全工程最大的单个文件。
+  // 它不参与「能不能开打」，所以不进 boot 组：
+  // 启动加载条只管画面与音效，进游戏后再在后台把它拉下来。
   'audio.school-anthem': {
     type: 'audio',
     src: 'assets/audio/school-anthem.mp3',
     label: '校歌《奉献美好给未来》',
-    group: 'boot',
+    group: 'music',
     loop: true
   },
 
@@ -134,22 +139,23 @@ export const MANIFEST = {
     label: '背景 · 战斗', group: 'boot'
   },
 
-  // 角色帧动画：AI 生成的动作表经 tools/build-sprites.mjs 抠图拼版后的产物
-  'sprites.lan': {
-    type: 'image', src: 'assets/images/sprites/lan.webp',
-    label: '角色素材 · 陈小蓝', group: 'boot'
+  // 身体底模帧动画：AI 生成的动作表经 tools/build-sprites.mjs 抠图拼版后的产物。
+  // 这四个 id 只描述「身体形态」，不绑定任何人物 —— 角色身份全部来自 roster.js + 头像。
+  'sprites.slim': {
+    type: 'image', src: 'assets/images/sprites/slim.webp',
+    label: '体型素材 · 偏瘦', group: 'boot'
   },
-  'sprites.zang': {
-    type: 'image', src: 'assets/images/sprites/zang.webp',
-    label: '角色素材 · 李阿藏', group: 'boot'
+  'sprites.stout': {
+    type: 'image', src: 'assets/images/sprites/stout.webp',
+    label: '体型素材 · 壮实', group: 'boot'
   },
-  'sprites.man': {
-    type: 'image', src: 'assets/images/sprites/man.webp',
-    label: '角色素材 · 林小满', group: 'boot'
+  'sprites.normal': {
+    type: 'image', src: 'assets/images/sprites/normal.webp',
+    label: '体型素材 · 匀称', group: 'boot'
   },
-  'sprites.zhuang': {
-    type: 'image', src: 'assets/images/sprites/zhuang.webp',
-    label: '角色素材 · 黄大壮', group: 'boot'
+  'sprites.heavy': {
+    type: 'image', src: 'assets/images/sprites/heavy.webp',
+    label: '体型素材 · 偏胖', group: 'boot'
   },
 
   // 真实照片头像：assets/贴图/<学号>.webp（512px 长边、保留透明通道），运行时叠到对应的身体帧上

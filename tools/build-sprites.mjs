@@ -19,16 +19,20 @@ const BIN = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
              'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].find(p => existsSync(p));
 const BASE = 'http://127.0.0.1:3000';
 
-/** 动作表来源：main = 4×2 八姿势，ext = 1×2（KO / 胜利） */
+/**
+ * 动作表来源：main = 4×2 八姿势，ext = 1×2（KO / 胜利）
+ * id 只表示身体形态（偏瘦 / 壮实 / 匀称 / 偏胖），不携带任何角色身份信息；
+ * 角色名字、头像、数值全部由 src/data/roster.js 决定。
+ */
 const CHARS = [
-  { id: 'lan',    main: '/assets/images/poses/sheet-lan-photo.jpg',    ext: '/assets/images/poses/ext-lan.jpg' },
-  { id: 'zang',   main: '/assets/images/poses/sheet-zang-photo.jpg',   ext: '/assets/images/poses/ext-zang.jpg' },
-  // man 用 sheet-man-walk.jpg：第 2 格（walkA）与第 3 格（walkB）都取自原表像素，
+  { id: 'slim',   main: '/assets/images/poses/sheet-slim-photo.jpg',   ext: '/assets/images/poses/ext-slim.jpg' },
+  { id: 'stout',  main: '/assets/images/poses/sheet-stout-photo.jpg',  ext: '/assets/images/poses/ext-stout.jpg' },
+  // normal 用 sheet-normal-walk.jpg：第 2 格（walkA）与第 3 格（walkB）都取自原表像素，
   // 不引入任何 AI 生成帧，保证画风 100% 一致。第 3 格由第 2 格做下半身渐进收拢形变
-  // （腰线以下绕骨盆中轴压缩到 0.80，smoothstep 过渡）得到，等于 lan 那种
+  // （腰线以下绕骨盆中轴压缩到 0.80，smoothstep 过渡）得到，等于 slim 那种
   // 「剪刀腿 → 收腿通过」的两帧走路结构：walkA 迈开、walkB 收拢，交替即步伐
-  { id: 'man',    main: '/assets/images/poses/sheet-man-walk.jpg',    ext: '/assets/images/poses/ext-man.jpg' },
-  { id: 'zhuang', main: '/assets/images/poses/sheet-zhuang-photo.jpg', ext: '/assets/images/poses/ext-zhuang.jpg' }
+  { id: 'normal', main: '/assets/images/poses/sheet-normal-walk.jpg',  ext: '/assets/images/poses/ext-normal.jpg' },
+  { id: 'heavy',  main: '/assets/images/poses/sheet-heavy-photo.jpg',  ext: '/assets/images/poses/ext-heavy.jpg' }
 ];
 
 /** 目标：站立身高（精灵图内像素）。越大越清晰，文件越大 */
@@ -322,7 +326,7 @@ try {
   const dir = join(ROOT, 'assets', 'images', 'sprites');
   mkdirSync(dir, { recursive: true });
 
-  let js = `/**\n * 角色精灵图元数据（由 tools/build-sprites.mjs 自动生成，不要手改）\n * ------------------------------------------------------------\n * 每个身材一张 5 列 × 2 行的帧表：idle / walkA / walkB / jump / windup /\n * punch / block / hurt / ko / win，所有帧共用同一锚点（脚底）。\n * 头部贴图坐标不在这里，统一放在 src/data/heads.js。\n */\n`;
+  let js = `/**\n * 身体底模元数据（由 tools/build-sprites.mjs 自动生成，不要手改）\n * ------------------------------------------------------------\n * 每个体型一张 5 列 × 2 行的帧表：idle / walkA / walkB / jump / windup /\n * punch / block / hurt / ko / win，所有帧共用同一锚点（脚底）。\n * id 只描述身体形态，不携带任何人物身份：\n *   slim 偏瘦 / normal 匀称 / heavy 偏胖 / stout 壮实。\n * 角色名字与数值一律在 src/data/roster.js，头部贴图坐标在 src/data/heads.js。\n */\n`;
 
   const all = [];
   for (const r of data) {

@@ -1,13 +1,15 @@
 /**
- * 角色精灵图元数据（由 tools/build-sprites.mjs 自动生成，不要手改）
+ * 身体底模元数据（由 tools/build-sprites.mjs 自动生成，不要手改）
  * ------------------------------------------------------------
- * 每个身材一张 5 列 × 2 行的帧表：idle / walkA / walkB / jump / windup /
+ * 每个体型一张 5 列 × 2 行的帧表：idle / walkA / walkB / jump / windup /
  * punch / block / hurt / ko / win，所有帧共用同一锚点（脚底）。
- * 头部贴图坐标不在这里，统一放在 src/data/heads.js。
+ * id 只描述身体形态，不携带任何人物身份：
+ *   slim 偏瘦 / normal 匀称 / heavy 偏胖 / stout 壮实。
+ * 角色名字与数值一律在 src/data/roster.js，头部贴图坐标在 src/data/heads.js。
  */
 export const SPRITES = [
   {
-    "id": "lan",
+    "id": "slim",
     "w": 1890,
     "h": 908,
     "slotW": 378,
@@ -18,7 +20,7 @@ export const SPRITES = [
     "bodyH": 420
   },
   {
-    "id": "zang",
+    "id": "stout",
     "w": 1845,
     "h": 930,
     "slotW": 369,
@@ -29,7 +31,7 @@ export const SPRITES = [
     "bodyH": 420
   },
   {
-    "id": "man",
+    "id": "normal",
     "w": 1930,
     "h": 912,
     "slotW": 386,
@@ -40,7 +42,7 @@ export const SPRITES = [
     "bodyH": 420
   },
   {
-    "id": "zhuang",
+    "id": "heavy",
     "w": 1840,
     "h": 956,
     "slotW": 368,

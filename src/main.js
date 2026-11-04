@@ -49,17 +49,27 @@ async function bootGame() {
   setStatus('正在加载资源…');
 
   const bootKeys = keysOfGroup('boot');
-  const totalLabel = bootKeys.length;
+  const labelOf = key => (MANIFEST[key] ? MANIFEST[key].label : '资源');
+  let decodeNotified = false;
 
   try {
-    await assets.preload(bootKeys, (ratio, total, key) => {
+    await assets.preload(bootKeys, (ratio, total, key, phase) => {
       setProgress(ratio);
-      const spec = MANIFEST[key];
-      const label = spec ? spec.label : '资源';
-      if (total > 0) {
-        setStatus('正在加载 ' + label + ' · ' + Math.round(ratio * 100) + '%');
-      } else if (totalLabel > 0) {
-        setStatus('正在加载 ' + label);
+
+      // 下载完成、尚在解码：这时资源还不能画，进度条不能算它已就绪
+      if (phase === 'decode') {
+        if (!decodeNotified) {
+          decodeNotified = true;
+          setStatus('正在准备画面…');
+        }
+        return;
+      }
+      if (phase === 'retry') {
+        setStatus('正在重试 ' + labelOf(key) + '…');
+        return;
+      }
+      if (phase === 'download') {
+        setStatus('正在加载 ' + labelOf(key) + ' · ' + Math.round(ratio * 100) + '%');
       }
     });
   } catch (e) {
@@ -67,14 +77,31 @@ async function bootGame() {
     console.warn('[boot] 预加载异常：', e && e.message);
   }
 
+  // 以缓存为准判断「真的可用」：下载成功但解码失败同样算缺失，
+  // 这里不静默略过，否则就会出现「画面先缺一块、过一会儿才补上」。
+  const missing = bootKeys.filter(k => !assets.has(k));
+  if (missing.length) {
+    console.warn('[boot] 以下素材未能就绪，已降级启动：', missing);
+    setStatus('有 ' + missing.length + ' 个素材没加载成功，先开打');
+    await new Promise(resolve => setTimeout(resolve, 900));
+  }
+
   setProgress(1);
   setStatus('准备开打…');
+
+  // 等进度条这一帧真正画出来再淡出，避免「100% 没看见就进游戏」
+  await new Promise(resolve => {
+    const done = () => resolve();
+    requestAnimationFrame(() => requestAnimationFrame(done));
+    setTimeout(done, 200); // 后台标签页 rAF 不跑时兜底
+  });
 
   // 进入游戏
   startLoop();
   hideBoot();
 
-  // 预加载完成后顺便初始化原声轨（真正出声仍要等第一次交互）
+  // 校歌不参与启动（5.3MB），进游戏后再后台拉；
+  // 首次交互时 Sound.unlock() 会共享同一个 Promise，加载完自动接上。
   BGM.init();
 }
 

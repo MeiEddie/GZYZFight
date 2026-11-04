@@ -17,6 +17,12 @@ export const BGM = {
   el: null,
   /** 原声是否可用（决定菜单显示「原声」还是「合成」，也决定是否静音合成器） */
   ok: false,
+  /**
+ * 载入状态：idle | loading | ok | fail
+ * 校歌已移出启动关键路径，进游戏后才在后台加载，
+ * 菜单据此显示「原声载入中…」，避免文案从「合成」突然跳成「原声」。
+ */
+  status: 'idle',
   /** 加载 Promise（幂等，多次调用共享） */
   promise: null,
   /** 音量 */
@@ -34,14 +40,17 @@ export const BGM = {
   },
 
   async _load() {
+    this.status = 'loading';
     try {
       this.el = await assets.audio(ANTHEM_KEY);
       this.el.loop = true;
       this.el.volume = this.muted ? 0 : this.vol;
       this.ok = true;
+      this.status = 'ok';
     } catch (e) {
       console.warn('[bgm] 校歌原声不可用，回退到合成编曲：' + e.message);
       this.ok = false;
+      this.status = 'fail';
     }
     return this.ok;
   },

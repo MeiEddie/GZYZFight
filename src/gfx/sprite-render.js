@@ -2,7 +2,9 @@
  * 图片帧角色渲染
  * ------------------------------------------------------------
  * 用 AI 生成的「动作表」切帧组装动画：
- *   - 四种身材各一张 5×2 帧表（idle/walkA/walkB/jump/windup/punch/block/hurt/ko/win）
+ *   - 四种体型（slim / normal / heavy / stout）各一张 5×2 帧表，
+ *     帧序 idle/walkA/walkB/jump/windup/punch/block/hurt/ko/win
+ *   - 体型 id 只描述身体形态，不含任何人物信息：头像与身份由 roster.js 决定
  *   - 按状态机取帧，走路两帧交替，攻击按前摇/判定分段
  *   - 帧与帧共用同一缩放系数，脚底对齐地面，因此不会忽大忽小
  *   - 真实头像不预先烘焙，运行时按 HEAD_POINTS 的头部坐标直接叠到当前帧上
@@ -43,11 +45,20 @@ const bitmapOf = id => assets.get('sprites.' + id);
 const FRAME = { idle: 0, walkA: 1, walkB: 2, jump: 3, windup: 4, punch: 5, block: 6, hurt: 7, ko: 8, win: 9 };
 const KO_FRAME = 8;
 
-/** 需要水平镜像的帧（底模 id → 帧序号）：防御型受击帧原表朝向与其它帧相反 */
-const MIRROR_FRAMES = { zang: [FRAME.hurt] };
+/** 需要水平镜像的帧（底模 id → 帧序号）：stout 受击帧原表朝向与其它帧相反 */
+const MIRROR_FRAMES = { stout: [FRAME.hurt] };
 
 /** 照片裁剪结果缓存（学号 → { bmp, crop }），只在首次绘制时扫描一次透明边 */
 const faceCache = new Map();
+
+/**
+ * 透明边扫描的采样边长。
+ * 头像原图 512px，逐像素扫一遍约 7ms；选人界面一次要扫 14 张，
+ * 上百毫秒全压在同一帧里，会看到明显的顿一下。
+ * 先缩到 128 长边再扫，成本降到 1/16，换算回原图坐标后的边界误差不到 4px，
+ * 对最终显示尺寸（战斗 81px / 头像框几十像素）没有影响。
+ */
+const FACE_PROBE = 128;
 
 function faceOf(no) {
   if (!no) return null;
@@ -56,26 +67,44 @@ function faceOf(no) {
   // 资源还没加载完 / 学号没有登记头像时先不缓存，避免把 null 永久记住
   if (!bmp) return null;
 
+  const w = bmp.width, h = bmp.height;
+  const k = Math.min(1, FACE_PROBE / Math.max(w, h));
+  const pw = Math.max(1, Math.round(w * k));
+  const ph = Math.max(1, Math.round(h * k));
+
   const c = document.createElement('canvas');
-  c.width = bmp.width; c.height = bmp.height;
+  c.width = pw; c.height = ph;
   const g = c.getContext('2d', { willReadFrequently: true });
-  g.drawImage(bmp, 0, 0);
-  const d = g.getImageData(0, 0, c.width, c.height).data;
-  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
-  for (let y = 0; y < c.height; y++) {
-    for (let x = 0; x < c.width; x++) {
-      if (d[(y * c.width + x) * 4 + 3] > 16) {
+  g.drawImage(bmp, 0, 0, pw, ph);
+
+  const d = g.getImageData(0, 0, pw, ph).data;
+  let x0 = pw, y0 = ph, x1 = -1, y1 = -1;
+  for (let y = 0; y < ph; y++) {
+    for (let x = 0; x < pw; x++) {
+      if (d[(y * pw + x) * 4 + 3] > 16) {
         if (x < x0) x0 = x; if (x > x1) x1 = x;
         if (y < y0) y0 = y; if (y > y1) y1 = y;
       }
     }
   }
-  const face = {
-    bmp,
-    crop: x1 < 0
-      ? { x: 0, y: 0, w: c.width, h: c.height }
-      : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 }
-  };
+
+  // 缩略图坐标 → 原图坐标
+  let crop;
+  if (x1 < 0) {
+    crop = { x: 0, y: 0, w: w, h: h };
+  } else {
+    const sx = w / pw, sy = h / ph;
+    const cx = Math.max(0, Math.floor(x0 * sx));
+    const cy = Math.max(0, Math.floor(y0 * sy));
+    crop = {
+      x: cx,
+      y: cy,
+      w: Math.min(w - cx, Math.ceil((x1 - x0 + 1) * sx)),
+      h: Math.min(h - cy, Math.ceil((y1 - y0 + 1) * sy))
+    };
+  }
+
+  const face = { bmp, crop };
   faceCache.set(no, face);
   return face;
 }

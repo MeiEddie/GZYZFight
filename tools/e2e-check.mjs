@@ -157,6 +157,9 @@ try {
   await cdp.send('Runtime.enable');
   await cdp.send('Log.enable');
   await cdp.send('Page.enable');
+  // 每次都取最新代码：本地服务给了 max-age=600，不禁用缓存会跑到改动前的旧模块
+  await cdp.send('Network.enable');
+  await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
   // 固定视口，保证截图尺寸稳定（headless 默认窗口只有 500x320）
   await cdp.send('Emulation.setDeviceMetricsOverride', {
     width: 1400, height: 800, deviceScaleFactor: 1, mobile: false
@@ -175,10 +178,43 @@ try {
   }
   ok(booted, '启动完成，加载层已淡出');
 
+  /* 4.1 启动完成时 boot 组必须全部就绪：不允许「下载失败被当成成功」 */
+  const bootState = await cdp.eval(`(() => {
+    const m = GZYZ.assets.manifest;
+    const keys = Object.keys(m).filter(k => m[k].group === 'boot');
+    return { total: keys.length, missing: keys.filter(k => !GZYZ.assets.has(k)) };
+  })()`);
+  ok(bootState && bootState.missing.length === 0,
+    '启动完成时 boot 组素材全部就绪（无静默缺失）',
+    JSON.stringify(bootState));
+
+  /* 4.2 校歌已移出启动路径：进菜单后才后台加载 */
+  ok(await cdp.eval(`GZYZ.assets.manifest['audio.school-anthem'].group !== 'boot'`),
+    '校歌不在 boot 组（不阻塞启动）');
+
+  /* 4.3 身体底模：恰好四个，且命名只描述体型、不再带人物名 */
+  const bodyState = await cdp.eval(`(() => {
+    const keys = Object.keys(GZYZ.assets.manifest).filter(k => k.startsWith('sprites.'));
+    return {
+      ids: keys.map(k => k.slice(8)),
+      missing: keys.filter(k => !GZYZ.assets.has(k)),
+      legacy: keys.filter(k => /(lan|zang|man|zhuang)/.test(k))
+    };
+  })()`);
+  ok(bodyState && bodyState.ids.length === 4 && bodyState.missing.length === 0,
+    '四种体型底模全部就绪', JSON.stringify(bodyState));
+  ok(bodyState && bodyState.legacy.length === 0,
+    '体型命名已不含旧人物名', bodyState ? bodyState.ids.join(',') : '');
+
+  let bgmOk = false;
+  for (let i = 0; i < 60 && !bgmOk; i++) {
+    bgmOk = await cdp.eval(`GZYZ.BGM.ok`);
+    if (!bgmOk) await sleep(250);
+  }
+  ok(bgmOk === true, '校歌在后台加载完成后接管原声轨', String(bgmOk));
+  ok(await cdp.eval(`GZYZ.BGM.status`) === 'ok', 'BGM 状态机进入 ok（菜单显示「原声」）');
   const assets = await cdp.eval(`JSON.stringify(GZYZ.assets.inspect())`);
-  ok(assets.includes('audio.school-anthem'), '校歌原声已加载进资源缓存', assets);
-  const bgmOk = await cdp.eval(`GZYZ.BGM.ok`);
-  ok(bgmOk === true, 'BGM 原声轨接管成功（菜单应显示「原声」）', String(bgmOk));
+  ok(assets.includes('audio.school-anthem'), '校歌原声已加入资源缓存');
 
   await sleep(700);
   await cdp.shot('e2e-1-menu');
@@ -202,17 +238,33 @@ try {
   await cdp.press('Enter', 'Enter', 13);      // 1P 确认 → phase 2（光标默认落在有人的座位）
   ok(await cdp.eval(`GZYZ.game.sel.phase`) === 2, '1P 确认后进入 2P 选人');
   await cdp.press('Enter', 'Enter', 13);      // 2P 确认 → phase 4
-  await sleep(1400);
-  ok(await cdp.eval(`GZYZ.game.scene`) === 'battle', '进入战斗场景');
-  await sleep(1200);
+  let inBattle = false;
+  for (let i = 0; i < 60 && !inBattle; i++) {
+    await sleep(150);
+    inBattle = await cdp.eval(`GZYZ.game.scene === 'battle'`);
+  }
+  ok(inBattle, '进入战斗场景');
+
+  // 开场演出（intro 1.6s）期间游戏不接受输入，
+  // headless 帧率只有实时的六成左右，固定 sleep 会踩进演出里把攻击吞掉，
+  // 所以这里等真实状态而不是赌时间。
+  for (let i = 0; i < 80; i++) {
+    if (await cdp.eval(`!!GZYZ.game.battle && GZYZ.game.battle.intro === 0`)) break;
+    await sleep(150);
+  }
+  ok(await cdp.eval(`GZYZ.game.battle.intro === 0`), '开场演出结束，可以出拳');
   await cdp.shot('e2e-4-battle');
 
   /* 7. 打一拳，确认伤害与特效链路 */
   const hpBefore = await cdp.eval(`GZYZ.game.battle.p2.hp`);
   await cdp.eval(`GZYZ.game.battle.p1.x = GZYZ.game.battle.p2.x - 70`);
   await cdp.press('KeyJ', 'j', 74);
-  await sleep(150);
-  const particles = await cdp.eval(`GZYZ.game.battle.particles.length`);
+
+  let particles = 0;
+  for (let i = 0; i < 24 && !particles; i++) {
+    await sleep(50);
+    particles = await cdp.eval(`GZYZ.game.battle.particles.length`);
+  }
   ok(particles > 0, '命中特效粒子已生成', particles + ' 个');
   await sleep(600);
   const hpAfter = await cdp.eval(`GZYZ.game.battle.p2.hp`);
@@ -236,8 +288,12 @@ try {
   await cdp.eval(`GZYZ.game.battle.p2.hp = 5; GZYZ.game.battle.p2.displayHp = 5;`);
   await cdp.eval(`GZYZ.game.battle.p1.x = GZYZ.game.battle.p2.x - 70`);
   await cdp.press('KeyJ', 'j', 74);
-  await sleep(3400);
-  ok(await cdp.eval(`GZYZ.game.scene`) === 'result', 'KO 后进入结算界面');
+  let toResult = false;
+  for (let i = 0; i < 100 && !toResult; i++) {
+    await sleep(150);
+    toResult = await cdp.eval(`GZYZ.game.scene === 'result'`);
+  }
+  ok(toResult, 'KO 后进入结算界面');
   await cdp.shot('e2e-6-result');
   await cdp.press('Enter', 'Enter', 13);
   await sleep(400);
@@ -253,9 +309,18 @@ try {
   await cdp.press('Enter', 'Enter', 13);
   ok(await cdp.eval(`GZYZ.game.mode`) === 'pve', '进入人机模式');
   await cdp.press('KeyJ', 'j', 74);             // 1P 确认 → 摇人
-  ok(await cdp.eval(`GZYZ.game.sel.phase`) === 3, 'CPU 开始摇人');
-  await sleep(2600);
-  ok(await cdp.eval(`GZYZ.game.scene`) === 'battle', '人机对战进入战斗');
+  let cpuStarted = false;
+  for (let i = 0; i < 30 && !cpuStarted; i++) {
+    await sleep(100);
+    cpuStarted = await cdp.eval(`GZYZ.game.sel.phase === 3`);
+  }
+  ok(cpuStarted, 'CPU 开始摇人');
+  let pveBattle = false;
+  for (let i = 0; i < 100 && !pveBattle; i++) {
+    await sleep(150);
+    pveBattle = await cdp.eval(`GZYZ.game.scene === 'battle'`);
+  }
+  ok(pveBattle, '人机对战进入战斗');
 
   /* 12. 资源释放能力 */
   const released = await cdp.eval(`(() => {

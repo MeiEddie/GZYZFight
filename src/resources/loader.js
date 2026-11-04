@@ -17,9 +17,25 @@
  *       本地请用 `npx serve`（见 README）；打包后的单文件会内联素材，file:// 也能跑。
  */
 import { MANIFEST, keysOfGroup } from './manifest.js';
+import { ASSET_BYTES } from './sizes.js';
 
 /** 单个资源的加载超时（毫秒），避免坏文件把启动卡死 */
 const LOAD_TIMEOUT = 30000;
+
+/** 音频解码超时（毫秒）：到点放行，但会被标记为「降级」 */
+const AUDIO_DECODE_TIMEOUT = 6000;
+
+/** 体积表里查不到的资源按这个权重估算（小图标的量级） */
+const DEFAULT_WEIGHT = 48 * 1024;
+
+/** 下载阶段的进度占比，剩下 10% 留给解码 */
+const DOWNLOAD_SHARE = .9;
+
+/** 取某资源的权重（字节）；查不到就给一个保守默认值 */
+function weightOf(key) {
+  const n = ASSET_BYTES && ASSET_BYTES[key];
+  return n > 0 ? n : DEFAULT_WEIGHT;
+}
 
 /** data: URI → Blob（单文件版内联素材时使用，避免依赖 fetch） */
 function dataUriToBlob(uri) {
@@ -104,6 +120,9 @@ async function decodeAudio(blob, spec) {
   el.loop = !!spec.loop;
   el.volume = spec.volume !== undefined ? spec.volume : .55;
 
+  /** 超时放行的音频：元素在，但元数据没就绪，播放可能失败 */
+  let degraded = false;
+
   await new Promise((resolve, reject) => {
     let settled = false;
     let timer = 0;
@@ -130,14 +149,15 @@ async function decodeAudio(blob, spec) {
     timer = setTimeout(() => {
       if (settled) return;
       settled = true;
+      degraded = true;
       cleanup();
-      console.warn('[assets] 音频元数据超时，已放行：' + spec.src);
+      console.warn('[assets] 音频元数据超时，标记为降级：' + spec.src);
       resolve();
-    }, 6000);
+    }, AUDIO_DECODE_TIMEOUT);
 
     el.load();
   });
-  return { drawable: el, kind: 'audio', url };
+  return { drawable: el, kind: 'audio', url, degraded };
 }
 
 /**
@@ -165,6 +185,45 @@ export class AssetManager {
   }
 
   /**
+   * 只下载、不解码。预加载时先把字节全部拿到，再统一解码，
+   * 这样「下载进度」和「准备画面」是两个阶段，进度条不会假装走完。
+   * @param {string} key
+   * @param {(ratio:number)=>void} [onBytes] 单文件字节进度 0..1
+   * @returns {Promise<Blob>}
+   */
+  download(key, onBytes) {
+    const spec = this.manifest[key];
+    if (!spec) return Promise.reject(new Error(`未在 manifest 登记的资源: ${key}`));
+    return fetchBlob(spec.src, onBytes);
+  }
+
+  /**
+   * 把已下载的字节解码并写入缓存。
+   * @param {string} key
+   * @param {Blob} blob
+   * @returns {Promise<object>} 缓存记录
+   */
+  async commit(key, blob) {
+    const spec = this.manifest[key];
+    const decoded = spec.type === 'audio'
+      ? await decodeAudio(blob, spec)
+      : await decodeImage(blob);
+
+    const rec = {
+      key,
+      type: spec.type,
+      data: decoded.drawable,
+      kind: decoded.kind,
+      url: decoded.url || null,
+      bytes: blob.size,
+      /** 超时放行的音频：可用性存疑，仅作标记，不阻断启动 */
+      degraded: !!decoded.degraded
+    };
+    this.cache.set(key, rec);
+    return rec;
+  }
+
+  /**
    * 加载一个资源（幂等，重复调用复用同一个 Promise）。
    * @param {string} key
    * @param {(ratio:number)=>void} [onBytes] 单文件字节进度 0..1
@@ -172,26 +231,13 @@ export class AssetManager {
   load(key, onBytes) {
     if (this.cache.has(key)) return Promise.resolve(this.cache.get(key));
     if (this.inflight.has(key)) return this.inflight.get(key);
-
-    const spec = this.manifest[key];
-    if (!spec) return Promise.reject(new Error(`未在 manifest 登记的资源: ${key}`));
+    if (!this.manifest[key]) {
+      return Promise.reject(new Error(`未在 manifest 登记的资源: ${key}`));
+    }
 
     const task = (async () => {
-      const blob = await fetchBlob(spec.src, onBytes);
-      const decoded = spec.type === 'audio'
-        ? await decodeAudio(blob, spec)
-        : await decodeImage(blob);
-
-      const rec = {
-        key,
-        type: spec.type,
-        data: decoded.drawable,
-        kind: decoded.kind,
-        url: decoded.url || null,
-        bytes: blob.size
-      };
-      this.cache.set(key, rec);
-      return rec;
+      const blob = await this.download(key, onBytes);
+      return this.commit(key, blob);
     })();
 
     this.inflight.set(key, task);
@@ -213,36 +259,99 @@ export class AssetManager {
 
   /**
    * 批量预加载，带聚合进度。
-   * 单个资源失败只记日志，不阻断启动（游戏可以退化运行）。
+   * ------------------------------------------------------------
+   * 两个阶段：
+   *   1. 下载 0 → 90%，按「字节权重」聚合（大文件自然占大头，进度不会假死）
+   *   2. 解码 90 → 100%，全部字节到手后才开始，解码完才算真正可用
+   *
+   * 失败语义：失败不会被当成成功。下载失败会重试一次；
+   * 仍失败的资源记进 failed，由调用方决定提示或降级。
+   *
    * @param {string[]} keys
-   * @param {(ratio:number, total:number, key:string)=>void} [onProgress]
+   * @param {(ratio:number, total:number, key:string, phase:'download'|'retry'|'decode'|'done')=>void} [onProgress]
+   * @returns {Promise<{loaded:string[], failed:string[], degraded:string[]}>}
    */
   async preload(keys, onProgress) {
     const list = keys.filter(k => !this.cache.has(k));
     if (!list.length) {
-      if (onProgress) onProgress(1, 0, '');
-      return;
+      if (onProgress) onProgress(1, 0, '', 'done');
+      return { loaded: [], failed: [], degraded: [] };
     }
 
+    const total = list.length;
+    const weights = new Map(list.map(k => [k, weightOf(k)]));
+    const totalBytes = list.reduce((s, k) => s + weights.get(k), 0) || 1;
     const frac = new Map(list.map(k => [k, 0]));
-    const report = key => {
+    const blobs = new Map();
+    const failed = [];
+    const degraded = [];
+
+    /* ---------------- 阶段 1：下载 ---------------- */
+    let lastRatio = -1;
+    const reportDownload = key => {
       if (!onProgress) return;
       let sum = 0;
-      for (const v of frac.values()) sum += v;
-      onProgress(sum / list.length, list.length, key);
+      for (const [k, v] of frac) sum += weights.get(k) * v;
+      const ratio = DOWNLOAD_SHARE * Math.min(1, sum / totalBytes);
+      // 变化不足 0.4% 就不刷新，省掉无意义的 DOM 写入
+      if (ratio - lastRatio < .004) return;
+      lastRatio = ratio;
+      onProgress(ratio, total, key, 'download');
     };
 
-    report(list[0]);
+    reportDownload(list[0]);
+
     await Promise.all(list.map(async key => {
       try {
-        await this.load(key, r => { frac.set(key, r); report(key); });
-        frac.set(key, 1);
+        const blob = await this.download(key, r => { frac.set(key, r); reportDownload(key); });
+        blobs.set(key, blob);
       } catch (e) {
-        console.warn('[assets] 加载失败:', key, e.message);
-        frac.set(key, 1);
+        console.warn('[assets] 下载失败:', key, e && e.message);
+        failed.push(key);
       }
-      report(key);
+      frac.set(key, 1);
+      reportDownload(key);
     }));
+
+    /* 下载失败重试一次：慢网抖动、连接被重置，多半第二次能过 */
+    if (failed.length) {
+      const again = failed.splice(0, failed.length);
+      if (onProgress) onProgress(DOWNLOAD_SHARE, total, again[0], 'retry');
+      await Promise.all(again.map(async key => {
+        try {
+          blobs.set(key, await this.download(key));
+        } catch (e) {
+          console.warn('[assets] 重试仍失败:', key, e && e.message);
+          failed.push(key);
+        }
+      }));
+    }
+
+    /* ---------------- 阶段 2：解码 ---------------- */
+    const entries = [...blobs.entries()];
+    if (onProgress) onProgress(DOWNLOAD_SHARE, total, entries.length ? entries[0][0] : '', 'decode');
+
+    let done = 0;
+    const decodeTotal = entries.length || 1;
+    await Promise.all(entries.map(async ([key, blob]) => {
+      try {
+        const rec = await this.commit(key, blob);
+        if (rec.degraded) degraded.push(key);
+      } catch (e) {
+        console.warn('[assets] 解码失败:', key, e && e.message);
+        failed.push(key);
+      }
+      done += 1;
+      if (onProgress) {
+        onProgress(DOWNLOAD_SHARE + (1 - DOWNLOAD_SHARE) * (done / decodeTotal), total, key, 'decode');
+      }
+    }));
+
+    return {
+      loaded: [...blobs.keys()].filter(k => this.cache.has(k)),
+      failed,
+      degraded
+    };
   }
 
   /** 按 manifest 的 group 预加载 */
