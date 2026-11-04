@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="description" content="广州市第一中学 格斗小游戏">
+  <title>一中快打</title>
+  <link rel="icon" href="assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/boot.css">
+</head>
+<body>
+  <!-- 舞台：只有一个 canvas，所有画面都画在这上面 -->
+  <div id="stage">
+    <canvas id="game" width="1280" height="720" aria-label="一中快打游戏画面"></canvas>
+  </div>
+
+  <!-- 启动加载层：由 src/main.js 驱动进度并淡出 -->
+  <div id="boot" class="boot">
+    <div class="boot__panel">
+      <h1 class="boot__title">一中快打</h1>
+      <p class="boot__subtitle">广州市第一中学</p>
+      <div class="boot__bar">
+        <span id="boot-progress" class="boot__bar-fill"></span>
+      </div>
+      <p id="boot-status" class="boot__status">正在加载…</p>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

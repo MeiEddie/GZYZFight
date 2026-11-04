@@ -1,0 +1,46 @@
+/* =========================================================
+   基础布局：一个居中的 16:9 舞台
+   ========================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #eaf2fb;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  color: #14304a;
+}
+
+/* 舞台：铺满视口，内部居中放画布 */
+#stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eaf2fb;
+}
+
+/* 画布：铺满整个窗口；逻辑 1280x720 等比缩放由 JS 计算，底边贴屏幕底 */
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  background: #eaf3fd;
+  touch-action: none;
+}

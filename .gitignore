@@ -1,0 +1,22 @@
+# 端到端测试的浏览器缓存（体积很大，绝不入库）
+.screenshots/
+
+# 单文件打包产物：本仓库走 GitHub Pages 模块版，不需要它
+dist/
+
+# 旧管线素材与切帧源图：运行时不引用，仅本地保留用于重新构建
+assets/人物/
+assets/images/poses/
+
+# 历史快照与原始素材备份
+archive/
+assets_origin/
+
+# 本地工具临时目录
+.trae-html-share-packages/
+.workbuddy/
+node_modules/
+
+# 操作系统杂项
+Thumbs.db
+.DS_Store
