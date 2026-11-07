@@ -71,63 +71,63 @@ export const TYPE_BODY = {
 export const ROSTER = [
   {
     no: 1, name: '梅圣尧', role: '23届16班', tag: '速度型',
-    intro: '高一（3）班短跑主力。出手快、收招快，抢节奏的一把好手。'
+    intro: '原高三16班同学'
   },
   {
     no: 3, name: '陈相宇', role: '23届16班', tag: '速度型',
-    intro: '校队队长，一身紫白校服。速度力量都不吃亏的全能选手。'
+    intro: '原高三16班同学'
   },
   {
     no: 6, name: '陈子奕', role: '23届16班', tag: '力量型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 10, name: '房彬彬', role: '23届16班', tag: '速度型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 11, name: '郭梓熙', role: '23届16班', tag: '速度型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 13, name: '黄子桓', role: '23届16班', tag: '力量型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 18, name: '刘睿哲', role: '23届16班', tag: '速度型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 21, name: '隆子涵', role: '23届16班', tag: '速度型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 23, name: '乔巧', role: '23届16班', tag: '均衡型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 26, name: '陶明泽', role: '23届16班', tag: '防御型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 28, name: '徐柏轩', role: '23届16班', tag: '防御型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 31, name: '杨紫仁', role: '23届16班', tag: '速度型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 32, name: '叶天蓝', role: '23届16班', tag: '防御型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 33, name: '余天睿', role: '23届16班', tag: '防御型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   },
   {
     no: 39, name: '钟瀚林', role: '23届16班', tag: '速度型',
-    intro: '真实照片换脸角色。想改名字 / 班级 / 数值，直接改 roster.js。'
+    intro: '原高三16班同学'
   }
 ].map(def => ({
   ...(FIGHTER_TYPES[def.tag] || FIGHTER_TYPES['均衡型']),
