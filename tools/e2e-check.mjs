@@ -198,9 +198,9 @@ try {
     '启动完成时 boot 组 49 项资源全部就绪（全部图像与音效，无静默缺失）',
     JSON.stringify(bootState));
 
-  /* 4.2 只有校歌不参与启动门禁，首屏后才后台加载 */
+  /* 4.2 校歌单独一条进度条，也参与启动门禁 */
   ok(bootState && bootState.anthemGroup === 'bgm',
-    '校歌属于 bgm 组（首屏后加载，不阻塞菜单）');
+    '校歌属于 bgm 组，单独占用下方进度条');
   ok(bootState && bootState.bootGroups.battle === undefined && bootState.bootGroups.boot === 49,
     '图像与音效全部随启动加载，不再有 battle 分组', JSON.stringify(bootState.bootGroups));
 
@@ -224,7 +224,15 @@ try {
     bgmOk = await cdp.eval(`GZYZ.BGM.ok`);
     if (!bgmOk) await sleep(250);
   }
-  ok(bgmOk === true, '首屏不等待校歌，后台加载随后完成', String(bgmOk));
+  ok(bgmOk === true, '校歌已随启动加载完成（第二条进度条走完才进入游戏）', String(bgmOk));
+
+  /* 4.3b 两条进度条都必须走到 100% */
+  const bootBars = await cdp.eval(`(() => ({
+    assets: getComputedStyle(document.getElementById('boot-progress')).getPropertyValue('--progress').trim(),
+    bgm: getComputedStyle(document.getElementById('boot-bgm-progress')).getPropertyValue('--bgm-progress').trim()
+  }))()`);
+  ok(bootBars && bootBars.assets === '1' && bootBars.bgm === '1',
+    '进入游戏前上方与下方进度条均已到 100%', JSON.stringify(bootBars));
   ok(await cdp.eval(`GZYZ.BGM.status`) === 'ok', 'BGM 状态机进入 ok（菜单显示「原声」）');
   const anthem = await cdp.eval(`JSON.stringify((() => {
     const el = GZYZ.BGM.el;

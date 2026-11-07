@@ -5,6 +5,7 @@
 
 .boot {
   --progress: 0;
+  --bgm-progress: 0;
   position: fixed;
   inset: 0;
   z-index: 10;
@@ -65,12 +66,28 @@
   transition: transform .25s ease;
 }
 
+.boot__bar--bgm {
+  height: 4px;
+  margin-top: 2px;
+}
+
+.boot__bar--bgm .boot__bar-fill {
+  transform: scaleX(var(--bgm-progress));
+  background: linear-gradient(90deg, #9d8cff, #ffd67a);
+}
+
 .boot__status {
   margin: 0;
   min-height: 20px;
   font-size: 13px;
   letter-spacing: .04em;
   color: rgba(20, 48, 74, .72);
+}
+
+.boot__status--bgm {
+  min-height: 18px;
+  font-size: 12px;
+  color: rgba(20, 48, 74, .58);
 }
 
 .boot__hint {
