@@ -26,9 +26,28 @@ import {
 } from '../battle/fighter.js';
 import { ROSTER } from '../data/roster.js';
 import { Sound } from '../audio/sound.js';
+import { assets } from '../resources/loader.js';
 
-/** 开始一局：装配双方单位并切场景 */
+/** 进战斗前统一校验 battle 组，避免战斗背景 / 音效还没到就开场 */
+let preparing = false;
+
+/** 开始一局：先确认战斗资源就绪，再装配双方单位并切场景 */
 export function startBattle() {
+  if (preparing) return;
+  preparing = true;
+  const from = game.scene;
+
+  // 菜单出现后 main.js 已在后台预载；这里通常立即命中缓存。
+  // 若用户等待期间离开了原场景（例如结算页返回选人），放弃这次切换。
+  assets.preloadGroup('battle').then(() => {
+    preparing = false;
+    if (game.scene === from) beginBattle();
+  }).catch(() => {
+    preparing = false;
+  });
+}
+
+function beginBattle() {
   const d1 = ROSTER[game.sel.p1], d2 = ROSTER[game.sel.p2];
   game.battle = {
     p1: mkFighter(d1, 1, 408, 1),

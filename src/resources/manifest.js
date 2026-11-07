@@ -8,21 +8,21 @@
  *   type   image | audio
  *   src    相对 index.html 的路径
  *   label  加载进度里展示的中文名
- *   group  boot = 启动时预加载（决定能不能进菜单，越小越快）
- *          music = 进游戏后台加载，不阻塞启动
- *          lazy = 用到时才加载（按需）
+ *   group  boot   = 首屏必需，全部加载完成才显示菜单
+ *          battle = 战斗 / 结算必需，菜单出现后在后台预载，进战斗前校验
+ *          bgm    = 校歌原声，首屏出现后再加载，不参与启动门禁
  *   loop   仅 audio：是否循环
  */
 
 export const MANIFEST = {
-  // 校歌 5.3MB，是全工程最大的单个文件。
-  // 它不参与「能不能开打」，所以不进 boot 组：
-  // 启动加载条只管画面与音效，进游戏后再在后台把它拉下来。
+  // 校歌原件 5.3MB（192k 立体声），压缩后约 1.3MB（VBR 单声道 32kHz）。
+  // 原件在 assets_origin/pre-compress-20261104/audio/，重编码参数见 tools/compress-assets.mjs。
+  // 不参与启动门禁：首屏出现后由 main.js 后台加载，菜单不会为它空等。
   'audio.school-anthem': {
     type: 'audio',
     src: 'assets/audio/school-anthem.mp3',
     label: '校歌《奉献美好给未来》',
-    group: 'music',
+    group: 'bgm',
     loop: true
   },
 
@@ -32,7 +32,7 @@ export const MANIFEST = {
     type: 'audio',
     src: 'assets/audio/hit.ogg',
     label: '音效 · 击打',
-    group: 'boot'
+    group: 'battle'
   },
 
   // 胜利 / 失败音效（均 CC0，免署名）
@@ -41,14 +41,14 @@ export const MANIFEST = {
     type: 'audio',
     src: 'assets/audio/win.ogg',
     label: '音效 · 胜利',
-    group: 'boot'
+    group: 'battle'
   },
   // 来源：https://opengameart.org/content/game-over-trumpet-sfx
   'audio.lose': {
     type: 'audio',
     src: 'assets/audio/lose.mp3',
     label: '音效 · 失败',
-    group: 'boot'
+    group: 'battle'
   },
 
   // 开场音效
@@ -56,24 +56,24 @@ export const MANIFEST = {
   // 来源：https://opengameart.org/content/pleasing-bell-sound-effect
   'audio.ready': {
     type: 'audio',
-    src: 'assets/audio/ready.wav',
+    src: 'assets/audio/ready.mp3',
     label: '音效 · 准备',
-    group: 'boot'
+    group: 'battle'
   },
   // 开打 / KO：DRAGON 播报包（CC-BY，署名 VoiceBosch / SoundBiter）
   // 两句取自同一个播报员，音色与语气完全一致
   // 来源：https://opengameart.org/content/dragon-announcer-audio-pack
   'audio.fight': {
     type: 'audio',
-    src: 'assets/audio/fight.wav',
+    src: 'assets/audio/fight.mp3',
     label: '音效 · 开打',
-    group: 'boot'
+    group: 'battle'
   },
   'audio.ko': {
     type: 'audio',
-    src: 'assets/audio/ko.wav',
+    src: 'assets/audio/ko.mp3',
     label: '音效 · KO',
-    group: 'boot'
+    group: 'battle'
   },
 
   // UI 与动作音：
@@ -100,33 +100,33 @@ export const MANIFEST = {
   },
   'audio.jump': {
     type: 'audio',
-    src: 'assets/audio/jump.wav',
+    src: 'assets/audio/jump.mp3',
     label: '音效 · 跳跃',
-    group: 'boot'
+    group: 'battle'
   },
   'audio.swing': {
     type: 'audio',
-    src: 'assets/audio/swing.wav',
+    src: 'assets/audio/swing.mp3',
     label: '音效 · 挥拳',
-    group: 'boot'
+    group: 'battle'
   },
 
   // 格挡：Metal Clang Sounds（CC0）
   // https://opengameart.org/content/metal-clang-sounds
   'audio.block': {
     type: 'audio',
-    src: 'assets/audio/block.wav',
+    src: 'assets/audio/block.mp3',
     label: '音效 · 格挡',
-    group: 'boot'
+    group: 'battle'
   },
 
   // 读秒提示：Interface Beeps（CC0）
   // https://opengameart.org/content/interface-beeps
   'audio.time': {
     type: 'audio',
-    src: 'assets/audio/time.wav',
+    src: 'assets/audio/time.mp3',
     label: '音效 · 读秒',
-    group: 'boot'
+    group: 'battle'
   },
 
   // 场景背景图：主界面 / 战斗界面
@@ -136,29 +136,34 @@ export const MANIFEST = {
   },
   'images.battle-bg': {
     type: 'image', src: 'assets/2.webp',
-    label: '背景 · 战斗', group: 'boot'
+    label: '背景 · 战斗', group: 'battle'
   },
 
   // 身体底模帧动画：AI 生成的动作表经 tools/build-sprites.mjs 抠图拼版后的产物。
   // 这四个 id 只描述「身体形态」，不绑定任何人物 —— 角色身份全部来自 roster.js + 头像。
+  //
+  // 只有 slim 属于 boot：主菜单两侧展示的角色是 ROSTER[0] 与 ROSTER[1]，
+  // 两位都是「速度型」→ slim。选人界面只画头像，不画身体，所以其余三种体型
+  // 等到进战斗前再校验即可。若改动了菜单展示角色 / 其类型，记得把对应体型挪回 boot。
   'sprites.slim': {
     type: 'image', src: 'assets/images/sprites/slim.webp',
     label: '体型素材 · 偏瘦', group: 'boot'
   },
   'sprites.stout': {
     type: 'image', src: 'assets/images/sprites/stout.webp',
-    label: '体型素材 · 壮实', group: 'boot'
+    label: '体型素材 · 壮实', group: 'battle'
   },
   'sprites.normal': {
     type: 'image', src: 'assets/images/sprites/normal.webp',
-    label: '体型素材 · 匀称', group: 'boot'
+    label: '体型素材 · 匀称', group: 'battle'
   },
   'sprites.heavy': {
     type: 'image', src: 'assets/images/sprites/heavy.webp',
-    label: '体型素材 · 偏胖', group: 'boot'
+    label: '体型素材 · 偏胖', group: 'battle'
   },
 
-  // 真实照片头像：assets/贴图/<学号>.webp（512px 长边、保留透明通道），运行时叠到对应的身体帧上
+  // 真实照片头像：assets/贴图/<学号>.webp（160px 长边、保留透明通道），运行时叠到对应的身体帧上。
+  // 运行时最大只画 81px，因此 160px 仍有约 2 倍余量；原件是 512px，存在上述备份目录。
   'faces.1': { type: 'image', src: 'assets/贴图/1.webp', label: '头像 · 学号01', group: 'boot' },
   'faces.3': { type: 'image', src: 'assets/贴图/3.webp', label: '头像 · 学号03', group: 'boot' },
   'faces.6': { type: 'image', src: 'assets/贴图/6.webp', label: '头像 · 学号06', group: 'boot' },

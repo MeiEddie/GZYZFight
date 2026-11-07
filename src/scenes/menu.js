@@ -1,7 +1,7 @@
 /**
  * 场景：主菜单
  * ------------------------------------------------------------
- * 左侧标题 + 右侧四项菜单（双人 / 人机 / 说明 / 音乐），
+ * 左侧标题 + 右侧四项菜单（人机 / 双人 / 说明 / 音乐），
  * 两侧站着两个角色做展示位，背景是黄昏操场。
  */
 import { ctx, screenBounds } from '../core/stage.js';
@@ -20,8 +20,8 @@ import { startSelect } from './select.js';
 
 /** 菜单项定义（只保留功能文案，不写英文副标题） */
 export const MENU_ITEMS = [
-  { id: 'pvp', label: '双人对战', accent: '#159ad6' },
   { id: 'pve', label: '人机对战', accent: '#ef5b4d' },
+  { id: 'pvp', label: '双人对战', accent: '#159ad6' },
   { id: 'help', label: '操作说明', accent: '#d99a00' },
   { id: 'music', label: '音乐：开', accent: '#7b5cf0' }
 ];

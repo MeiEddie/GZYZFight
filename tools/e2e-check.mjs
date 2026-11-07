@@ -178,31 +178,45 @@ try {
   }
   ok(booted, '启动完成，加载层已淡出');
 
-  /* 4.1 启动完成时 boot 组必须全部就绪：不允许「下载失败被当成成功」 */
+  /* 4.1 启动完成时 boot 组必须全部就绪；战斗与校歌允许在首屏后后台加载 */
   const bootState = await cdp.eval(`(() => {
     const m = GZYZ.assets.manifest;
-    const keys = Object.keys(m).filter(k => m[k].group === 'boot');
-    return { total: keys.length, missing: keys.filter(k => !GZYZ.assets.has(k)) };
+    const keys = Object.keys(m);
+    const boot = keys.filter(k => m[k].group === 'boot');
+    return {
+      total: boot.length,
+      all: keys.length,
+      missing: boot.filter(k => !GZYZ.assets.has(k)),
+      bootGroups: Object.keys(m).reduce((acc, k) => {
+        acc[m[k].group] = (acc[m[k].group] || 0) + 1;
+        return acc;
+      }, {}),
+      anthemGroup: m['audio.school-anthem'].group
+    };
   })()`);
-  ok(bootState && bootState.missing.length === 0,
-    '启动完成时 boot 组素材全部就绪（无静默缺失）',
+  ok(bootState && bootState.total === 35 && bootState.missing.length === 0,
+    '启动完成时 boot 组 35 项资源全部就绪（无静默缺失）',
     JSON.stringify(bootState));
 
-  /* 4.2 校歌已移出启动路径：进菜单后才后台加载 */
-  ok(await cdp.eval(`GZYZ.assets.manifest['audio.school-anthem'].group !== 'boot'`),
-    '校歌不在 boot 组（不阻塞启动）');
+  /* 4.2 校歌与战斗资源不参与启动门禁，首屏后才能后台加载 */
+  ok(bootState && bootState.anthemGroup === 'bgm',
+    '校歌属于 bgm 组（首屏后加载，不阻塞菜单）');
+  ok(bootState && bootState.bootGroups.battle === 14,
+    '战斗资源（含三种体型）单独成组，进战斗前再校验', JSON.stringify(bootState.bootGroups));
 
   /* 4.3 身体底模：恰好四个，且命名只描述体型、不再带人物名 */
   const bodyState = await cdp.eval(`(() => {
     const keys = Object.keys(GZYZ.assets.manifest).filter(k => k.startsWith('sprites.'));
     return {
       ids: keys.map(k => k.slice(8)),
-      missing: keys.filter(k => !GZYZ.assets.has(k)),
+      // 只有 slim 在 boot 组：菜单两侧展示的两位角色都是速度型；
+      // 其余三种体型随 battle 组在首屏后预载，进战斗前校验。
+      bootMissing: keys.filter(k => GZYZ.assets.manifest[k].group === 'boot' && !GZYZ.assets.has(k)),
       legacy: keys.filter(k => /(lan|zang|man|zhuang)/.test(k))
     };
   })()`);
-  ok(bodyState && bodyState.ids.length === 4 && bodyState.missing.length === 0,
-    '四种体型底模全部就绪', JSON.stringify(bodyState));
+  ok(bodyState && bodyState.ids.length === 4 && bodyState.bootMissing.length === 0,
+    '四种体型均已登记，boot 组所需的 slim 已就绪', JSON.stringify(bodyState));
   ok(bodyState && bodyState.legacy.length === 0,
     '体型命名已不含旧人物名', bodyState ? bodyState.ids.join(',') : '');
 
@@ -211,13 +225,51 @@ try {
     bgmOk = await cdp.eval(`GZYZ.BGM.ok`);
     if (!bgmOk) await sleep(250);
   }
-  ok(bgmOk === true, '校歌在后台加载完成后接管原声轨', String(bgmOk));
+  ok(bgmOk === true, '首屏不等待校歌，后台加载随后完成', String(bgmOk));
   ok(await cdp.eval(`GZYZ.BGM.status`) === 'ok', 'BGM 状态机进入 ok（菜单显示「原声」）');
+  const anthem = await cdp.eval(`JSON.stringify((() => {
+    const el = GZYZ.BGM.el;
+    return { readyState: el ? el.readyState : -1, duration: el ? el.duration : -1, error: el && el.error ? el.error.code : 0 };
+  })())`);
+  ok(await cdp.eval(`(() => { const el = GZYZ.BGM.el; return !!el && el.readyState >= 1 && isFinite(el.duration) && el.duration > 0 && !el.error; })()`),
+    '校歌元数据与时长可解析（音频确实能播）', anthem);
   const assets = await cdp.eval(`JSON.stringify(GZYZ.assets.inspect())`);
   ok(assets.includes('audio.school-anthem'), '校歌原声已加入资源缓存');
 
+  /* 4.4 素材压缩成果：音频全部可解码、头像尺寸与总体积不回退 */
+  const audioState = await cdp.eval(`(() => {
+    const m = GZYZ.assets.manifest;
+    const keys = Object.keys(m).filter(k => m[k].type === 'audio');
+    const bad = [];
+    for (const k of keys) {
+      const el = GZYZ.assets.get(k);
+      if (!el) { bad.push(k + ':missing'); continue; }
+      if (el.readyState < 1 || !isFinite(el.duration) || el.duration <= 0 || el.error) {
+        bad.push(k + ':undecodable');
+      }
+    }
+    return { total: keys.length, bad };
+  })()`);
+  ok(audioState && audioState.total === 14 && audioState.bad.length === 0,
+    '14 个音频全部可解码（含 7 个 WAV→mp3 音效）', JSON.stringify(audioState));
+  const faceSize = await cdp.eval(`(() => {
+    const el = GZYZ.assets.get('faces.6');
+    return el ? { w: el.width, h: el.height } : null;
+  })()`);
+  ok(faceSize && Math.max(faceSize.w, faceSize.h) === 160,
+    '头像素材已压到 160px 长边', JSON.stringify(faceSize));
+  const totalKb = await cdp.eval(`GZYZ.assets.inspect().reduce((s, r) => s + r.kb, 0)`);
+  ok(totalKb > 0 && totalKb < 2800,
+    '启动资源总体积 < 2.8 MB（压缩成果未回退）', totalKb + ' KB');
+
   await sleep(700);
   await cdp.shot('e2e-1-menu');
+
+  /* 4.5 菜单顺序：人机在最上、双人第二。后续用例一律按 id 定位，不写死索引 */
+  const menuOrder = await cdp.eval(`GZYZ.MENU_ITEMS.map(x => x.id).join(',')`);
+  ok(menuOrder === 'pve,pvp,help,music', '菜单顺序为 人机 / 双人 / 说明 / 音乐', menuOrder);
+  ok(await cdp.eval(`GZYZ.game.menuIndex === 0 && GZYZ.MENU_ITEMS[0].label === '人机对战'`),
+    '默认光标落在第一项「人机对战」');
 
   /* 5. 菜单 → 操作说明 → 返回 */
   await cdp.press('ArrowDown', 'ArrowDown', 40);
@@ -230,9 +282,9 @@ try {
   ok(await cdp.eval(`GZYZ.game.scene`) === 'menu', 'ESC 返回主菜单');
 
   /* 6. 双人对战：菜单 → 选人 → 选人确认 → 战斗 */
-  await cdp.eval(`GZYZ.game.menuIndex = 0`);
+  await cdp.eval(`GZYZ.game.menuIndex = GZYZ.MENU_ITEMS.findIndex(x => x.id === 'pvp')`);
   await cdp.press('Enter', 'Enter', 13);
-  ok(await cdp.eval(`GZYZ.game.scene`) === 'select', '进入选人');
+  ok(await cdp.eval(`GZYZ.game.scene`) === 'select' && await cdp.eval(`GZYZ.game.mode`) === 'pvp', '双人对战进入选人');
   await cdp.shot('e2e-3-select');
 
   await cdp.press('Enter', 'Enter', 13);      // 1P 确认 → phase 2（光标默认落在有人的座位）
@@ -244,6 +296,13 @@ try {
     inBattle = await cdp.eval(`GZYZ.game.scene === 'battle'`);
   }
   ok(inBattle, '进入战斗场景');
+  const battleSprites = await cdp.eval(`(() => {
+    const keys = Object.keys(GZYZ.assets.manifest)
+      .filter(k => k.startsWith('sprites.') && GZYZ.assets.manifest[k].group === 'battle');
+    return { battleSprites: keys.length, missing: keys.filter(k => !GZYZ.assets.has(k)) };
+  })()`);
+  ok(battleSprites && battleSprites.battleSprites === 3 && battleSprites.missing.length === 0,
+    '进战斗前 battle 组体型已按门禁补齐', JSON.stringify(battleSprites));
 
   // 开场演出（intro 1.6s）期间游戏不接受输入，
   // headless 帧率只有实时的六成左右，固定 sleep 会踩进演出里把攻击吞掉，
@@ -305,7 +364,7 @@ try {
   await cdp.press('ArrowDown', 'ArrowDown', 40);
   await cdp.press('Enter', 'Enter', 13);        // 返回主菜单
   ok(await cdp.eval(`GZYZ.game.scene`) === 'menu', '暂停菜单可返回主菜单');
-  await cdp.eval(`GZYZ.game.menuIndex = 1`);    // 人机对战
+  await cdp.eval(`GZYZ.game.menuIndex = GZYZ.MENU_ITEMS.findIndex(x => x.id === 'pve')`);    // 人机对战
   await cdp.press('Enter', 'Enter', 13);
   ok(await cdp.eval(`GZYZ.game.mode`) === 'pve', '进入人机模式');
   await cdp.press('KeyJ', 'j', 74);             // 1P 确认 → 摇人

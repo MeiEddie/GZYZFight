@@ -1,11 +1,15 @@
 /**
  * 应用入口
  * ------------------------------------------------------------
- * 启动顺序：
+ * 启动顺序（首屏严格门禁）：
  *   1. 适配画布（DPR）
- *   2. 预加载 boot 分组的资源，驱动加载进度条
- *   3. 启动主循环
- *   4. 淡出加载层
+ *   2. 预加载 boot 分组（菜单 + 选人所需），下载 + 解码都完成才继续
+ *   3. 逐项复核缓存，确认一件不缺
+ *   4. 启动主循环、淡出加载层
+ *   5. 首屏出现后，再后台预载战斗资源与校歌原声（不阻塞菜单）
+ *
+ * boot 组任一资源失败都会在加载层内持续重试，绝不显示残缺菜单。
+ * 战斗资源在进战斗前统一校验，校歌加载失败则自动回退到合成编曲。
  *
  * 首次点击 / 按键时才真正出声（浏览器自动播放策略）。
  */
@@ -16,6 +20,7 @@ import { Sound } from './audio/sound.js';
 import { BGM } from './audio/bgm.js';
 import { assets } from './resources/loader.js';
 import { keysOfGroup, MANIFEST } from './resources/manifest.js';
+import { MENU_ITEMS } from './scenes/menu.js';
 
 /* ---------------- 加载层 DOM ---------------- */
 const bootEl = document.getElementById('boot');
@@ -48,12 +53,12 @@ async function bootGame() {
   setProgress(0);
   setStatus('正在加载资源…');
 
-  const bootKeys = keysOfGroup('boot');
+  const bootKeys = keysOfGroup('boot');   // 菜单 + 选人所需，不含校歌与战斗专用资源
   const labelOf = key => (MANIFEST[key] ? MANIFEST[key].label : '资源');
   let decodeNotified = false;
 
   try {
-    await assets.preload(bootKeys, (ratio, total, key, phase) => {
+    await assets.preload(bootKeys, (ratio, total, key, phase, info) => {
       setProgress(ratio);
 
       // 下载完成、尚在解码：这时资源还不能画，进度条不能算它已就绪
@@ -65,7 +70,8 @@ async function bootGame() {
         return;
       }
       if (phase === 'retry') {
-        setStatus('正在重试 ' + labelOf(key) + '…');
+        const n = info && info.attempt ? info.attempt : 1;
+        setStatus('网络不稳，正在重试 ' + labelOf(key) + '（第 ' + n + ' 次）');
         return;
       }
       if (phase === 'download') {
@@ -73,18 +79,22 @@ async function bootGame() {
       }
     });
   } catch (e) {
-    // 预加载失败不阻断启动：游戏会退回合成音乐继续跑
-    console.warn('[boot] 预加载异常：', e && e.message);
+    // 严格门禁：异常一律停在加载层，绝不淡出、绝不进游戏
+    console.error('[boot] 资源未能全部就绪：', e && e.message);
+    setStatus('加载未完成，请检查网络后刷新页面');
+    return;
   }
 
-  // 以缓存为准判断「真的可用」：下载成功但解码失败同样算缺失，
-  // 这里不静默略过，否则就会出现「画面先缺一块、过一会儿才补上」。
+  // 双重校验：以缓存为准，下载成功但解码失败同样算缺失
   const missing = bootKeys.filter(k => !assets.has(k));
   if (missing.length) {
-    console.warn('[boot] 以下素材未能就绪，已降级启动：', missing);
-    setStatus('有 ' + missing.length + ' 个素材没加载成功，先开打');
-    await new Promise(resolve => setTimeout(resolve, 900));
+    console.error('[boot] 仍有素材缺失，保持加载层：', missing);
+    setStatus('有 ' + missing.length + ' 个素材未就绪，请检查网络后刷新页面');
+    return;
   }
+
+  // 校歌不再卡首屏：等菜单显示后再后台加载；
+  // 真正出声仍要等第一次交互（Sound.unlock 会在已就绪时开始播放）
 
   setProgress(1);
   setStatus('准备开打…');
@@ -96,13 +106,18 @@ async function bootGame() {
     setTimeout(done, 200); // 后台标签页 rAF 不跑时兜底
   });
 
-  // 进入游戏
+  // 一切就绪，才启动并显示游戏
   startLoop();
   hideBoot();
 
-  // 校歌不参与启动（5.3MB），进游戏后再后台拉；
-  // 首次交互时 Sound.unlock() 会共享同一个 Promise，加载完自动接上。
-  BGM.init();
+  // 首屏已经出现，开始后台预载不影响菜单的资源：
+  // 战斗资源优先（进战斗前还有一道校验），校歌稍后，避免同时抢带宽。
+  assets.preloadGroup('battle').catch(() => {});
+  setTimeout(() => {
+    BGM.init().then(ok => {
+      if (ok && Sound.enabled && Sound.unlocked) BGM.play();
+    });
+  }, 1200);
 }
 
 /* 首次交互解锁音频（键盘 / 点击 / 触摸任意一种） */
@@ -111,6 +126,6 @@ async function bootGame() {
 });
 
 /* 调试用：控制台可直接访问 window.GZYZ */
-window.GZYZ = { game, assets, Sound, BGM, cvs };
+window.GZYZ = { game, assets, Sound, BGM, cvs, MENU_ITEMS };
 
 bootGame();

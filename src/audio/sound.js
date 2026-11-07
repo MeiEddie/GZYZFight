@@ -39,8 +39,6 @@ export const Sound = {
   next: 0,
   /** 是否已被用户手势解锁 */
   unlocked: false,
-  /** 是否已经触发过原声轨初始化 */
-  bgmTried: false,
   /**
   * 上网找的真实采样：击打 / 胜利 / 失败 / 准备 / 开打 / KO / 全部 UI 与动作音。
   * 解码后记录起始静音偏移与响度归一化系数，拿不到时回退到合成音。
@@ -90,7 +88,7 @@ export const Sound = {
 
   /**
    * 用户第一次交互时解锁音频（键盘、点击、触摸都会调）。
-   * 同时尝试拉起校歌原声。
+   * 校歌由 main.js 在首屏后预热；这里只负责「已就绪则开始播放」。
    */
   unlock() {
     this.init();
@@ -99,10 +97,7 @@ export const Sound = {
 
     this.loadSamples();
 
-    if (!this.bgmTried) {
-      this.bgmTried = true;
-      BGM.init().then(ok => { if (ok && this.enabled) BGM.play(); });
-    }
+    if (BGM.ok) BGM.play();
   },
 
   /**

@@ -2,7 +2,8 @@
  * 校歌原始录音（BGM 主轨）
  * ------------------------------------------------------------
  * 与合成器解耦：本模块不依赖 Sound，只对外暴露 init / play / mute。
- * 由 Sound.unlock() 触发加载与播放，加载失败时 Sound 自动回退到合成编曲。
+ * 由 main.js 在首屏显示后初始化，Sound.unlock() 只负责触发播放。
+ * 加载失败时 Sound 自动回退到合成编曲。
  *
  * 音频元素来自资源管理器（src/resources/loader.js），因此
  * 「换校歌」只需要替换 assets/audio/school-anthem.mp3，代码不用改。
@@ -18,10 +19,10 @@ export const BGM = {
   /** 原声是否可用（决定菜单显示「原声」还是「合成」，也决定是否静音合成器） */
   ok: false,
   /**
- * 载入状态：idle | loading | ok | fail
- * 校歌已移出启动关键路径，进游戏后才在后台加载，
- * 菜单据此显示「原声载入中…」，避免文案从「合成」突然跳成「原声」。
- */
+   * 载入状态：idle | loading | ok | fail
+   * 首屏不等待校歌：菜单出现后 main.js 才调用 init()，下载在后台进行；
+   * 保留状态机是为了兼容运行时 release 之后重新初始化的情况。
+   */
   status: 'idle',
   /** 加载 Promise（幂等，多次调用共享） */
   promise: null,

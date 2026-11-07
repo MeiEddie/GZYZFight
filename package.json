@@ -1,6 +1,6 @@
 {
   "name": "gzyz-campus-clash",
-  "version": "0.4.2",
+  "version": "0.4.5",
   "private": true,
   "type": "module",
   "description": "广州市第一中学 校园同人格斗小游戏（纯 Canvas 实现）",
@@ -8,6 +8,7 @@
     "dev": "npx --yes serve -l 3000 .",
     "check": "node tools/check.mjs",
     "sizes": "node tools/stamp-sizes.mjs",
+    "compress": "node tools/compress-assets.mjs",
     "e2e": "node tools/e2e-check.mjs http://127.0.0.1:3000",
     "build": "node tools/build-single.mjs",
     "build:small": "node tools/build-single.mjs --skip-audio"

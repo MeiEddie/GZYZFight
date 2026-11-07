@@ -25,14 +25,14 @@ const BASE = 'http://127.0.0.1:3000';
  * 角色名字、头像、数值全部由 src/data/roster.js 决定。
  */
 const CHARS = [
-  { id: 'slim',   main: '/assets/images/poses/sheet-slim-photo.jpg',   ext: '/assets/images/poses/ext-slim.jpg' },
-  { id: 'stout',  main: '/assets/images/poses/sheet-stout-photo.jpg',  ext: '/assets/images/poses/ext-stout.jpg' },
+  { id: 'slim',   main: '/assets_origin/poses/sheet-slim-photo.jpg',   ext: '/assets_origin/poses/ext-slim.jpg' },
+  { id: 'stout',  main: '/assets_origin/poses/sheet-stout-photo.jpg',  ext: '/assets_origin/poses/ext-stout.jpg' },
   // normal 用 sheet-normal-walk.jpg：第 2 格（walkA）与第 3 格（walkB）都取自原表像素，
   // 不引入任何 AI 生成帧，保证画风 100% 一致。第 3 格由第 2 格做下半身渐进收拢形变
   // （腰线以下绕骨盆中轴压缩到 0.80，smoothstep 过渡）得到，等于 slim 那种
   // 「剪刀腿 → 收腿通过」的两帧走路结构：walkA 迈开、walkB 收拢，交替即步伐
-  { id: 'normal', main: '/assets/images/poses/sheet-normal-walk.jpg',  ext: '/assets/images/poses/ext-normal.jpg' },
-  { id: 'heavy',  main: '/assets/images/poses/sheet-heavy-photo.jpg',  ext: '/assets/images/poses/ext-heavy.jpg' }
+  { id: 'normal', main: '/assets_origin/poses/sheet-normal-walk.jpg',  ext: '/assets_origin/poses/ext-normal.jpg' },
+  { id: 'heavy',  main: '/assets_origin/poses/sheet-heavy-photo.jpg',  ext: '/assets_origin/poses/ext-heavy.jpg' }
 ];
 
 /** 目标：站立身高（精灵图内像素）。越大越清晰，文件越大 */
