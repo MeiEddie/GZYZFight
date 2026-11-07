@@ -118,7 +118,6 @@ export function startSelect() {
   s.p2 = rosterIndexOfSeat(s.cur2);
   s.cpuRoulette = 0; s.cpuPick = s.cur1; s.rouletteTick = 0; s.startTimer = 0; s.confirmFx = 0;
   goScene('select');
-  Sound.setSong('menu');
   Sound.sfx('select');
 }
 
@@ -295,7 +294,6 @@ export function updateSelect(dt) {
   if (edge('Escape')) {
     Sound.sfx('ui');
     goScene('menu');
-    Sound.setSong('menu');
     return;
   }
 

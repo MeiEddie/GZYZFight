@@ -80,9 +80,9 @@ export function drawMenu() {
   }
 
   // 底部提示
-  // 校歌在后台加载：先显示「载入中」，成功后才是「原声」，失败回退「合成」
+  // 校歌在后台加载：先显示「载入中」，成功后才是「原声」，失败则显示「不可用」
   const bgmLabel = BGM.status === 'ok' ? '原声'
-    : BGM.status === 'fail' ? '合成'
+    : BGM.status === 'fail' ? '校歌不可用'
       : '原声载入中';
   txtO('♪ 《奉献美好给未来》· ' + bgmLabel, 640, 664, 11, 'rgba(255,240,205,.9)', 'rgba(6,12,26,.85)', 2.5, 'center', 700, FONT, 1);
   txtO('W / S 选择    ENTER 确认    M 静音', 640, 692, 13, 'rgba(240,247,255,.96)', 'rgba(6,12,26,.85)', 3, 'center', 800, FONT, 2);

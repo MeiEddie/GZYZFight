@@ -194,29 +194,28 @@ try {
       anthemGroup: m['audio.school-anthem'].group
     };
   })()`);
-  ok(bootState && bootState.total === 35 && bootState.missing.length === 0,
-    '启动完成时 boot 组 35 项资源全部就绪（无静默缺失）',
+  ok(bootState && bootState.total === 49 && bootState.missing.length === 0,
+    '启动完成时 boot 组 49 项资源全部就绪（全部图像与音效，无静默缺失）',
     JSON.stringify(bootState));
 
-  /* 4.2 校歌与战斗资源不参与启动门禁，首屏后才能后台加载 */
+  /* 4.2 只有校歌不参与启动门禁，首屏后才后台加载 */
   ok(bootState && bootState.anthemGroup === 'bgm',
     '校歌属于 bgm 组（首屏后加载，不阻塞菜单）');
-  ok(bootState && bootState.bootGroups.battle === 14,
-    '战斗资源（含三种体型）单独成组，进战斗前再校验', JSON.stringify(bootState.bootGroups));
+  ok(bootState && bootState.bootGroups.battle === undefined && bootState.bootGroups.boot === 49,
+    '图像与音效全部随启动加载，不再有 battle 分组', JSON.stringify(bootState.bootGroups));
 
   /* 4.3 身体底模：恰好四个，且命名只描述体型、不再带人物名 */
   const bodyState = await cdp.eval(`(() => {
     const keys = Object.keys(GZYZ.assets.manifest).filter(k => k.startsWith('sprites.'));
     return {
       ids: keys.map(k => k.slice(8)),
-      // 只有 slim 在 boot 组：菜单两侧展示的两位角色都是速度型；
-      // 其余三种体型随 battle 组在首屏后预载，进战斗前校验。
+      // 四种体型全部属于 boot 组，随启动阶段一起加载完成。
       bootMissing: keys.filter(k => GZYZ.assets.manifest[k].group === 'boot' && !GZYZ.assets.has(k)),
       legacy: keys.filter(k => /(lan|zang|man|zhuang)/.test(k))
     };
   })()`);
   ok(bodyState && bodyState.ids.length === 4 && bodyState.bootMissing.length === 0,
-    '四种体型均已登记，boot 组所需的 slim 已就绪', JSON.stringify(bodyState));
+    '四种体型均已登记且随启动加载完毕', JSON.stringify(bodyState));
   ok(bodyState && bodyState.legacy.length === 0,
     '体型命名已不含旧人物名', bodyState ? bodyState.ids.join(',') : '');
 
@@ -297,12 +296,11 @@ try {
   }
   ok(inBattle, '进入战斗场景');
   const battleSprites = await cdp.eval(`(() => {
-    const keys = Object.keys(GZYZ.assets.manifest)
-      .filter(k => k.startsWith('sprites.') && GZYZ.assets.manifest[k].group === 'battle');
+    const keys = Object.keys(GZYZ.assets.manifest).filter(k => k.startsWith('sprites.'));
     return { battleSprites: keys.length, missing: keys.filter(k => !GZYZ.assets.has(k)) };
   })()`);
-  ok(battleSprites && battleSprites.battleSprites === 3 && battleSprites.missing.length === 0,
-    '进战斗前 battle 组体型已按门禁补齐', JSON.stringify(battleSprites));
+  ok(battleSprites && battleSprites.battleSprites === 4 && battleSprites.missing.length === 0,
+    '四种体型随启动加载完毕，进战斗无需再等资源', JSON.stringify(battleSprites));
 
   // 开场演出（intro 1.6s）期间游戏不接受输入，
   // headless 帧率只有实时的六成左右，固定 sleep 会踩进演出里把攻击吞掉，

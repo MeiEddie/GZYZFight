@@ -8,7 +8,7 @@
  *
  * 用法：
  *   node tools/build-single.mjs                # 含校歌音频（约 53MB）
- *   node tools/build-single.mjs --skip-audio   # 不含音频（约 45MB，BGM 走合成版）
+ *   node tools/build-single.mjs --skip-audio   # 不含音频（约 45MB，无背景音乐与音效）
  *
  * 产物：dist/gzyz-clash.single.html
  */
@@ -178,7 +178,7 @@ function build() {
   console.log('  内联素材：' + Object.keys(data).length + ' 个' + (skipped.length ? '，跳过 ' + skipped.join('、') : ''));
   console.log('  体积：' + (size > 1024 * 1024 ? mb(size) : kb(size)));
   console.log('\n双击该文件即可离线运行（不需要本地服务器）。');
-  if (skipAudio) console.log('注意：已跳过音频，BGM 将使用内置合成编曲。');
+  if (skipAudio) console.log('注意：已跳过音频，背景音乐与音效都不会发声。');
 }
 
 build();

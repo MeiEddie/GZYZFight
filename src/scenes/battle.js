@@ -26,25 +26,11 @@ import {
 } from '../battle/fighter.js';
 import { ROSTER } from '../data/roster.js';
 import { Sound } from '../audio/sound.js';
-import { assets } from '../resources/loader.js';
 
-/** 进战斗前统一校验 battle 组，避免战斗背景 / 音效还没到就开场 */
-let preparing = false;
 
-/** 开始一局：先确认战斗资源就绪，再装配双方单位并切场景 */
+/** 开始一局：图像与音效已在启动阶段加载完毕，直接装配双方单位并切场景 */
 export function startBattle() {
-  if (preparing) return;
-  preparing = true;
-  const from = game.scene;
-
-  // 菜单出现后 main.js 已在后台预载；这里通常立即命中缓存。
-  // 若用户等待期间离开了原场景（例如结算页返回选人），放弃这次切换。
-  assets.preloadGroup('battle').then(() => {
-    preparing = false;
-    if (game.scene === from) beginBattle();
-  }).catch(() => {
-    preparing = false;
-  });
+  beginBattle();
 }
 
 function beginBattle() {
@@ -60,7 +46,6 @@ function beginBattle() {
   game.paused = false;
   game.pauseIndex = 0;
   game.result = null;
-  Sound.setSong('battle');
   // 开场「准备」音效（真实素材，非合成）
   Sound.sfx('ready');
   goScene('battle');
@@ -368,7 +353,6 @@ function pauseAction(i) {
     game.paused = false;
     game.battle = null;
     goScene('menu');
-    Sound.setSong('menu');
   }
 }
 
@@ -401,7 +385,6 @@ export function finishBattle() {
   game.resultIndex = 0;
 
   goScene('result');
-  Sound.setSong('menu');
   // 人机模式里 2P 是 CPU：CPU 获胜即玩家失败
   if (b.winner) Sound.sfx(game.mode === 'pve' && b.winner === 2 ? 'lose' : 'win');
 }

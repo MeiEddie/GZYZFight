@@ -167,7 +167,6 @@ export function resultAction(i) {
     Sound.sfx('ui');
     game.battle = null;
     goScene('menu');
-    Sound.setSong('menu');
   }
 }
 

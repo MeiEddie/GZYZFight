@@ -4,7 +4,6 @@
  * 一个 requestAnimationFrame 驱动全部逻辑：
  *   计算 dt（上限 50ms，防止切后台回来瞬移）
  *   → update（各场景自己的逻辑）
- *   → Sound.tick（提前排音符）
  *   → render（各场景自己的绘制）
  *   → 清空瞬时输入
  *
@@ -13,7 +12,7 @@
 import { ctx, applyScreen, applyWorld, screenBounds, getView } from './stage.js';
 import { game } from './state.js';
 import { edge, clearPressed, clearHotspots, updateCursor } from './input.js';
-import { Sound, toggleMusic } from '../audio/sound.js';
+import { toggleMusic } from '../audio/sound.js';
 
 import { updateMenu, drawMenu } from '../scenes/menu.js';
 import { updateHelp, drawHelp } from '../scenes/help.js';
@@ -79,7 +78,6 @@ export function startLoop() {
     dt = Math.min(dt, .05);
 
     update(dt);
-    Sound.tick();
     render();
     updateCursor();
 

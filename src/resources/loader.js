@@ -306,9 +306,12 @@ export class AssetManager {
    *
    * @param {string[]} keys
    * @param {(ratio:number, total:number, key:string, phase:'download'|'retry'|'decode'|'done', info?:object)=>void} [onProgress]
+   * @param {{maxAttempts?:number}} [options] 单个资源最多重试几次；默认不限（启动门禁用），
+   *        按需预载时请传有限值，避免某个坏资源让调用方永远等不到结果。
    * @returns {Promise<{loaded:string[], failed:string[], attempts:number}>}
    */
-  async preload(keys, onProgress) {
+  async preload(keys, onProgress, options) {
+    const maxAttempts = options && options.maxAttempts > 0 ? options.maxAttempts : Infinity;
     const list = keys.filter(k => !this.cache.has(k));
     if (!list.length) {
       if (onProgress) onProgress(1, 0, '', 'done');
@@ -354,6 +357,7 @@ export class AssetManager {
         } catch (e) {
           n += 1; attempts += 1;
           frac.set(key, 0);            // 失败不冒充成功
+          if (n >= maxAttempts) throw new Error(`资源连续加载失败（${n} 次）: ${key} · ${e && e.message}`);
           console.warn(`[assets] 下载失败，重试 #${n}:`, key, e && e.message);
           const wait = backoff(n);
           notifyRetry(key, attempts, wait);
@@ -377,6 +381,7 @@ export class AssetManager {
         } catch (e) {
           n += 1; attempts += 1;
           blobs.delete(key);           // 这批字节作废，重新下载再解
+          if (n >= maxAttempts) throw new Error(`资源连续解码失败（${n} 次）: ${key} · ${e && e.message}`);
           console.warn(`[assets] 解码失败，重新下载 #${n}:`, key, e && e.message);
           const wait = backoff(n);
           notifyRetry(key, attempts, wait);
@@ -398,8 +403,8 @@ export class AssetManager {
   }
 
   /** 按 manifest 的 group 预加载 */
-  preloadGroup(group, onProgress) {
-    return this.preload(keysOfGroup(group), onProgress);
+  preloadGroup(group, onProgress, options) {
+    return this.preload(keysOfGroup(group), onProgress, options);
   }
 
   /**

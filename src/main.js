@@ -3,13 +3,13 @@
  * ------------------------------------------------------------
  * 启动顺序（首屏严格门禁）：
  *   1. 适配画布（DPR）
- *   2. 预加载 boot 分组（菜单 + 选人所需），下载 + 解码都完成才继续
+ *   2. 预加载 boot 分组（全部图像与音效），下载 + 解码都完成才继续
  *   3. 逐项复核缓存，确认一件不缺
  *   4. 启动主循环、淡出加载层
- *   5. 首屏出现后，再后台预载战斗资源与校歌原声（不阻塞菜单）
+ *   5. 首屏出现后，再后台加载校歌原声（不阻塞菜单）
  *
  * boot 组任一资源失败都会在加载层内持续重试，绝不显示残缺菜单。
- * 战斗资源在进战斗前统一校验，校歌加载失败则自动回退到合成编曲。
+ * 校歌加载失败时保持安静，不做合成音兜底。
  *
  * 首次点击 / 按键时才真正出声（浏览器自动播放策略）。
  */
@@ -53,7 +53,7 @@ async function bootGame() {
   setProgress(0);
   setStatus('正在加载资源…');
 
-  const bootKeys = keysOfGroup('boot');   // 菜单 + 选人所需，不含校歌与战斗专用资源
+  const bootKeys = keysOfGroup('boot');   // 全部图像与音效，只不含校歌
   const labelOf = key => (MANIFEST[key] ? MANIFEST[key].label : '资源');
   let decodeNotified = false;
 
@@ -93,6 +93,11 @@ async function bootGame() {
     return;
   }
 
+  // 音效在启动阶段就解码完毕：AudioContext 先建好但保持挂起（浏览器策略），
+  // 首次交互只负责 resume，进游戏后不会出现「前几声没响」的空窗。
+  Sound.init();
+  await Sound.loadSamples();
+
   // 校歌不再卡首屏：等菜单显示后再后台加载；
   // 真正出声仍要等第一次交互（Sound.unlock 会在已就绪时开始播放）
 
@@ -110,9 +115,7 @@ async function bootGame() {
   startLoop();
   hideBoot();
 
-  // 首屏已经出现，开始后台预载不影响菜单的资源：
-  // 战斗资源优先（进战斗前还有一道校验），校歌稍后，避免同时抢带宽。
-  assets.preloadGroup('battle').catch(() => {});
+  // 图像与音效已在启动阶段全部加载完成，这里只让校歌在首屏后安静地后台加载。
   setTimeout(() => {
     BGM.init().then(ok => {
       if (ok && Sound.enabled && Sound.unlocked) BGM.play();
